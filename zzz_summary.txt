@@ -9,6 +9,7 @@ analyzed (fits or txt, or both) from JADES and CANDELS catalogues.
 FILES: 
 - cross_match.ipynb: code that computes the cross-match between JADES and 
 CANDELS catalogues (DISCARDED).
+- barred_gal_detection.ipynb: code to detect bars in galaxies (DISCARDED).
 - data_sample.ipynb: code that selects and represents data sample
 - Logbook.ipynb: logbook of the project
 - make_postage_stamps: Luca's code to make stamps of galaxies by inputting

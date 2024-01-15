@@ -1,1 +1,7 @@
 observations/
+.ipynb_checkpoints/
+documents/
+bibliography/
+__pycache__/
+make_postage_stamps.py
+
