@@ -2,16 +2,19 @@ FOLDERS:
 - bibliography: books on galaxy formation, evolution and dynamics.
 - documents: official documents for the thesis.
 - observations: folder with all the observational data to be 
-analyzed (fits or txt, or both) from JADES and CANDELS catalogues.
+analyzed (fits or txt, or both) from JADES and CANDELS catalogues. Photometric
+catalogues.
+    - JWST_filters: mosaics (v.2.0) in all filters.
 - results: folder with the results from each notebook separated in subfolders.
 
 
 FILES: 
-- cross_match.ipynb: code that computes the cross-match between JADES and 
-CANDELS catalogues (DISCARDED).
-- barred_gal_detection.ipynb: code to detect bars in galaxies (DISCARDED).
 - data_sample.ipynb: code that selects and represents data sample
+- isophotal_analysis.ipynb: script to analyze galaxies from the selected sample
+using isophotes fit.
 - Logbook.ipynb: logbook of the project
 - make_postage_stamps: Luca's code to make stamps of galaxies by inputting
  image, RA and DEC of object.
 - morphology.ipynb: code that detects barred galaxies from input data sample.
+- visual_classification_training: script to generate a sample of galaxies with
+2<z<3 in order to train for the visual classification of the 'real' sample. 
