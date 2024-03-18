@@ -18,7 +18,7 @@ def _get_ax(fig, row, col, nrows, ncols, wpanel, hpanel, htop, eps, wfig, hfig):
     y_ax = eps + (nrows-1-row)*(hpanel+htop)
     return fig.add_axes([x_ax/wfig, y_ax/hfig, wpanel/wfig, hpanel/hfig])
 
-def make_figure(morph):
+def make_figure(morph,z,id):
     """
     Creates a figure analogous to Fig. 4 from Rodriguez-Gomez et al. (2019)
     for a given ``SourceMorphology`` object.
@@ -28,6 +28,10 @@ def make_figure(morph):
     morph : ``statmorph.SourceMorphology``
         An object containing the morphological measurements of a single
         source.
+    z : ``float``
+        Redshift of the source.
+    id : ``int``
+        ID of the source.
 
     Returns
     -------
@@ -35,6 +39,8 @@ def make_figure(morph):
         The figure.
 
     """
+    from astropy.cosmology import Planck15
+    from astropy import units as u
     import matplotlib.pyplot as plt
     import matplotlib.colors
     import matplotlib.cm
@@ -80,18 +86,21 @@ def make_figure(morph):
     ax = _get_ax(fig, 0, 0, nrows, ncols, wpanel, hpanel, htop, eps, wfig, hfig)
     ax.imshow(image, cmap='gray', origin='lower',
               norm=simple_norm(image, stretch='log', log_a=10000))
-    ax.plot(xc, yc, 'go', markersize=5, label='Centroid')
     R = np.sqrt(nx**2 + ny**2)
     theta = morph.orientation_centroid
     # Some text
-    text = 'flag = %d\nEllip. (Centroid) = %.4f\nEllip. (Asym.) = %.4f' % (
-        morph.flag, morph.ellipticity_centroid, morph.ellipticity_asymmetry)
+    text = 'ID: %.0f \n z = %.2f' % (id,z)
     ax.text(0.034, 0.966, text,
             horizontalalignment='left', verticalalignment='top',
             transform=ax.transAxes,
             bbox=dict(facecolor='white', alpha=1.0, boxstyle='round'))
+    text2 = 'Ellip. (Centroid) = %.3f\nEllip. (Asym.) = %.3f\nEllip. (Sérsic) = %.3f' % (
+        morph.ellipticity_centroid, morph.ellipticity_asymmetry, morph.sersic_ellip)
+    ax.text(0.55, 0.15, text2,
+            horizontalalignment='left', verticalalignment='top',
+            transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=1.0, boxstyle='round'))
     # Finish plot
-    ax.legend(loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
     ax.set_xlim(-0.5, nx-0.5)
     ax.set_ylim(-0.5, ny-0.5)
     ax.set_title('Original Image (Log Stretch)', fontsize=14)
@@ -110,15 +119,17 @@ def make_figure(morph):
     ax.imshow(sersic_model, cmap='gray', origin='lower',
               norm=simple_norm(image, stretch='log', log_a=10000))
     # Some text
-    text = ('flag_sersic = %d' % (morph.flag_sersic,) + '\n' +
-            'Ellip. (Sérsic) = %.4f' % (morph.sersic_ellip,) + '\n' +
-            r'$n = %.4f$' % (morph.sersic_n,))
+    rhalf_arcsec=morph.sersic_rhalf/67*2
+    distance = Planck15.angular_diameter_distance(z).to(u.parsec).value
+    rhalf_pc = (rhalf_arcsec * distance) / (206265 * (1 + z))
+    text = ('$R_e = $ %.2f' % (rhalf_arcsec,) + ' arcsec\n' +
+            r'$R_e = %.3f$' % (rhalf_pc/10**3,) + ' kpc\n' +
+            r'$n = %.2f$' % (morph.sersic_n,))
     ax.text(0.034, 0.966, text,
             horizontalalignment='left', verticalalignment='top',
             transform=ax.transAxes,
             bbox=dict(facecolor='white', alpha=1.0, boxstyle='round'))
     # Finish plot
-    #ax.legend(loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
     ax.set_title('Sérsic Model + Noise', fontsize=14)
     ax.set_xlim(-0.5, nx-0.5)
     ax.set_ylim(-0.5, ny-0.5)
@@ -134,11 +145,26 @@ def make_figure(morph):
     sersic_res[morph._mask_stamp] = 0.0
     ax.imshow(sersic_res, cmap='gray', origin='lower',
               norm=simple_norm(sersic_res, stretch='linear'))
+
+    ## Contour lines
+    ### Calculate the gradient of the image using np.gradient
+    dx, dy = np.gradient(sersic_res)
+
+    ### Calculate the magnitude of the gradient
+    gradient_magnitude = np.sqrt(dx**2 + dy**2)
+
+    ### Draw contours:
+    vmin=0.02
+    vmax=0.2
+    contour_levels=np.arange(vmin,vmax,(vmax-vmin)/2)
+    ax.contour(sersic_res, contour_levels, colors=['rosybrown','firebrick'], linewidths=1.5)
+
     ax.set_title('Sérsic Residual, ' + r'$I - I_{\rm model}$', fontsize=14)
     ax.set_xlim(-0.5, nx-0.5)
     ax.set_ylim(-0.5, ny-0.5)
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
+
 
     ######################
     # Asymmetry residual #
@@ -179,7 +205,7 @@ def make_figure(morph):
     ymin = morph._slice_skybox[0].start
     xmax = morph._slice_skybox[1].stop - 1
     ymax = morph._slice_skybox[0].stop - 1
-    ax.plot(np.array([xmin, xmax, xmax, xmin, xmin]),
+    skybox=ax.plot(np.array([xmin, xmax, xmax, xmin, xmin]),
             np.array([ymin, ymin, ymax, ymax, ymin]),
             'b', lw=1.5, label='Skybox')
     # Show gini segmap
@@ -187,7 +213,7 @@ def make_figure(morph):
     Z = np.float64(morph._segmap_gini)
     contour2=ax.contour(Z, contour_levels, colors='r', linewidths=1.5, label='Gini segmap')
     #Some text
-    text = r'$\left\langle {\rm S/N} \right\rangle = %.4f$' % (morph.sn_per_pixel,)
+    text = r'$\left\langle {\rm S/N} \right\rangle = %.0f$' % (morph.sn_per_pixel,)
     ax.text(0.034, 0.966, text, fontsize=12,
             horizontalalignment='left', verticalalignment='top',
             transform=ax.transAxes,
@@ -195,13 +221,14 @@ def make_figure(morph):
     # Create dummy lines for the legend
     contour_line1 = plt.Line2D((0,1),(0,0), color='k')
     contour_line2 = plt.Line2D((0,1),(0,0), color='r')
+    skybox_line=plt.Line2D((0,1),(0,0), color='b')
 
     # Add legend
-    ax.legend([contour_line1, contour_line2], ['Original segmap', 'Gini segmap'])
+    ax.legend([contour_line1, contour_line2,skybox_line], ['Original segmap', 'Gini segmap','Skybox'],
+	loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
     # Finish plot
     ax.set_xlim(-0.5, nx-0.5)
     ax.set_ylim(-0.5, ny-0.5)
-    ax.legend(loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
     ax.set_title('Segmaps', fontsize=14)
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
@@ -223,13 +250,6 @@ def make_figure(morph):
         ax.plot(sorted_xpeak[1], sorted_ypeak[1], 'ro', markersize=2,
                 label='Second Peak')
     # Some text
-    text = (r'$M = %.4f$' % (morph.multimode,) + '\n' +
-            r'$I = %.4f$' % (morph.intensity,) + '\n' +
-            r'$D = %.4f$' % (morph.deviation,))
-    ax.text(0.034, 0.034, text, fontsize=12,
-            horizontalalignment='left', verticalalignment='bottom',
-            transform=ax.transAxes,
-            bbox=dict(facecolor='white', alpha=1.0, boxstyle='round'))
     ax.legend(loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
     ax.set_title('Watershed Segmap (' + r'$I$' + ' statistic)', fontsize=14)
     ax.set_xlim(-0.5, nx-0.5)
