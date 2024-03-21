@@ -39,7 +39,7 @@ def make_figure(morph,z,id):
         The figure.
 
     """
-    from astropy.cosmology import Planck15
+    from astropy.cosmology import Planck18
     from astropy import units as u
     import matplotlib.pyplot as plt
     import matplotlib.colors
@@ -119,11 +119,12 @@ def make_figure(morph,z,id):
     ax.imshow(sersic_model, cmap='gray', origin='lower',
               norm=simple_norm(image, stretch='log', log_a=10000))
     # Some text
-    rhalf_arcsec=morph.sersic_rhalf/67*2
-    distance = Planck15.angular_diameter_distance(z).to(u.parsec).value
-    rhalf_pc = (rhalf_arcsec * distance) / (206265 * (1 + z))
+    rhalf_arcsec=morph.sersic_rhalf*0.03 #scale: 0.03 arcsec/px
+    d_A = Planck18.angular_diameter_distance(z)
+    scale_pc_arcsec = (d_A).to(u.pc) / (206265.0 * u.arcsec)
+    rhalf_kpc = rhalf_arcsec * scale_pc_arcsec / 1e3 / u.pc * u.arcsec
     text = ('$R_e = $ %.2f' % (rhalf_arcsec,) + ' arcsec\n' +
-            r'$R_e = %.3f$' % (rhalf_pc/10**3,) + ' kpc\n' +
+            r'$R_e = %.3f$' % (rhalf_kpc,) + ' kpc\n' +
             r'$n = %.2f$' % (morph.sersic_n,))
     ax.text(0.034, 0.966, text,
             horizontalalignment='left', verticalalignment='top',
@@ -154,10 +155,16 @@ def make_figure(morph,z,id):
     gradient_magnitude = np.sqrt(dx**2 + dy**2)
 
     ### Draw contours:
-    vmin=0.02
-    vmax=0.2
-    contour_levels=np.arange(vmin,vmax,(vmax-vmin)/2)
-    ax.contour(sersic_res, contour_levels, colors=['rosybrown','firebrick'], linewidths=1.5)
+    levels=np.percentile(sersic_res,[95.48,99])
+    ax.contour(sersic_res, levels, colors=['rosybrown','firebrick'], linewidths=1.5)
+    
+    # Create dummy lines for the legend
+    contour_line1 = plt.Line2D((0,1),(0,0), color='rosybrown')
+    contour_line2 = plt.Line2D((0,1),(0,0), color='firebrick')
+
+    # Add legend
+    ax.legend([contour_line1, contour_line2], ['2$\sigma$', '$3\sigma$'],
+        loc=4, fontsize=12, facecolor='w', framealpha=1.0, edgecolor='k')
 
     ax.set_title('Sérsic Residual, ' + r'$I - I_{\rm model}$', fontsize=14)
     ax.set_xlim(-0.5, nx-0.5)
